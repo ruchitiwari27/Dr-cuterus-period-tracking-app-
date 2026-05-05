@@ -1,0 +1,413 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Great+Vibes&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 343 63% 90%;
+    /* Exact color #F6D7E0 (Pale Pink) */
+    --foreground: 15 20% 31%;
+    /* Deep mauve/brown for high contrast text */
+
+    --card: 343 40% 98%;
+    --card-foreground: 343 30% 20%;
+
+    --popover: 343 40% 98%;
+    --popover-foreground: 343 30% 20%;
+
+    --primary: 343 70% 65%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 343 40% 95%;
+    --secondary-foreground: 343 40% 30%;
+
+    --muted: 343 30% 95%;
+    --muted-foreground: 343 20% 50%;
+
+    --accent: 343 60% 92%;
+    --accent-foreground: 343 40% 25%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 343 30% 88%;
+    --input: 343 30% 90%;
+    --ring: 343 60% 75%;
+
+    --radius: 1rem;
+
+    --sidebar-background: 343 30% 97%;
+    --sidebar-foreground: 343 25% 30%;
+    --sidebar-primary: 343 70% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 343 40% 94%;
+    --sidebar-accent-foreground: 343 30% 25%;
+    --sidebar-border: 343 30% 90%;
+    --sidebar-ring: 343 60% 75%;
+
+    /* Custom Dr. Cuterus tokens - Lavender Edition */
+    --dc-pink: 330 100% 97%;
+    --dc-pink-medium: 330 70% 85%;
+    --dc-pink-deep: 330 70% 65%;
+    --dc-lavender: 270 100% 97%;
+    --dc-lavender-medium: 270 60% 85%;
+    --dc-lavender-deep: 270 50% 65%;
+    --dc-teal: 175 60% 75%; /* Sampled Shaded Teal */
+    --dc-teal-light: 175 60% 90%;
+    --dc-gold: 40 80% 80%; /* Sampled Shaded Yellow */
+    --dc-peach: 330 60% 90%; /* Sampled Shaded Pink */
+    --dc-coral: 200 60% 85%; /* Sampled Shaded Blue */
+
+    --chart-grid: 270 10% 90%;
+    --chart-axis: 280 10% 40%;
+    --chart-line: 270 70% 65%;
+    --chart-label: 280 20% 30%;
+
+    --dc-gradient-main: #F6D7E0;
+    --dc-gradient-warm: #F6D7E0;
+    --dc-gradient-button: linear-gradient(135deg, #FF69B4 0%, #9370DB 100%);
+    --dc-gradient-button-hover: linear-gradient(135deg, #FF55A3 0%, #8A5ACC 100%);
+    --dc-gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.2) 100%);
+
+    --dc-glass-bg: rgba(255, 255, 255, 0.25);
+    --dc-glass-border: rgba(255, 255, 255, 0.5);
+    --dc-glass-shadow: 0 8px 32px rgba(180, 100, 160, 0.12);
+
+    --dc-pulse-glow: 0 0 15px rgba(232, 116, 158, 0.4);
+    --dc-pulse-glow-strong: 0 0 30px rgba(232, 116, 158, 0.7);
+
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  }
+
+  .dark {
+    --background: 280 30% 7%;
+    --foreground: 300 15% 95%;
+
+    --card: 280 25% 10%;
+    --card-foreground: 300 15% 95%;
+
+    --popover: 280 25% 10%;
+    --popover-foreground: 300 15% 95%;
+
+    --primary: 330 70% 65%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 270 40% 15%;
+    --secondary-foreground: 300 10% 85%;
+
+    --muted: 280 20% 15%;
+    --muted-foreground: 280 10% 65%;
+
+    --accent: 270 50% 20%;
+    --accent-foreground: 300 15% 95%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 280 20% 15%;
+    --input: 280 20% 15%;
+    --ring: 330 60% 60%;
+
+    --sidebar-background: 280 35% 6%;
+    --sidebar-foreground: 300 10% 85%;
+    --sidebar-primary: 330 70% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 270 40% 15%;
+    --sidebar-accent-foreground: 300 15% 95%;
+    --sidebar-border: 280 20% 15%;
+    --sidebar-ring: 330 60% 60%;
+
+    /* Custom Celestial Bloom tokens for Dark Mode */
+    --dc-pink: 330 40% 20%;
+    --dc-pink-medium: 330 50% 40%;
+    --dc-pink-deep: 330 70% 65%;
+    --dc-lavender: 270 40% 20%;
+    --dc-lavender-medium: 270 40% 45%;
+    --dc-lavender-deep: 270 50% 65%;
+    --dc-teal: 175 60% 40%;
+    --dc-teal-light: 175 40% 15%;
+    --dc-gold: 40 60% 40%;
+    --dc-peach: 25 50% 15%;
+    --dc-coral: 0 50% 40%;
+
+    --dc-gradient-main: linear-gradient(135deg, #0f0514 0%, #050208 100%);
+    --dc-gradient-warm: linear-gradient(135deg, #120615 0%, #0a040b 50%, #050208 100%);
+    --dc-gradient-card: linear-gradient(135deg, rgba(25, 10, 30, 0.7) 0%, rgba(10, 5, 20, 0.5) 100%);
+
+    --dc-glass-bg: rgba(10, 5, 15, 0.6);
+    --dc-glass-border: rgba(255, 255, 255, 0.08);
+    --dc-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+    --chart-grid: 280 20% 15%;
+    --chart-axis: 300 10% 70%;
+    --chart-line: 330 70% 65%;
+    --chart-label: 300 15% 90%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+    width: 100vw;
+  }
+}
+
+@layer components {
+  .dc-gradient-bg {
+    background: var(--dc-gradient-main);
+  }
+
+  .dc-gradient-warm {
+    background: var(--dc-gradient-warm);
+  }
+
+  .dc-glass {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(180, 100, 160, 0.08);
+  }
+
+  .dark .dc-glass {
+    background: rgba(15, 10, 25, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .dc-glass-strong {
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 12px 40px rgba(180, 100, 160, 0.12);
+  }
+
+  .dark .dc-glass-strong {
+    background: rgba(20, 10, 30, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+
+  .dc-glass-input {
+    background: var(--dc-glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--dc-glass-border);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .dc-btn-primary {
+    background: var(--dc-gradient-button);
+    color: white;
+    font-weight: 600;
+    border-radius: 1rem;
+    padding: 0.875rem 2rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(200, 100, 160, 0.3);
+  }
+
+  .dc-btn-primary:hover {
+    background: var(--dc-gradient-button-hover);
+    box-shadow: 0 6px 20px rgba(200, 100, 160, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .dc-heading {
+    font-family: var(--font-display);
+    color: hsl(var(--foreground));
+  }
+
+  .dc-text-gradient {
+    background: var(--dc-gradient-button);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .dc-phone-frame {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* On actual mobile devices / Capacitor, fill entire screen */
+  @media (max-width: 480px) {
+    .dc-phone-frame {
+      max-width: 100%;
+      border-radius: 0 !important;
+    }
+  }
+
+  /* Small phones (320px - iPhone SE, Galaxy S mini) */
+  @media (max-width: 360px) {
+    .dc-phone-frame {
+      font-size: 14px;
+    }
+  }
+
+  @keyframes dc-pulse-glow {
+
+    0%,
+    100% {
+      filter: drop-shadow(0 0 15px rgba(232, 116, 158, 0.4));
+    }
+
+    50% {
+      filter: drop-shadow(0 0 30px rgba(232, 116, 158, 0.7));
+    }
+  }
+
+  @keyframes dc-sparkle {
+
+    0%,
+    100% {
+      opacity: 0;
+      transform: scale(0) rotate(0deg);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1) rotate(180deg);
+    }
+  }
+
+  @keyframes dc-float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes dc-breathe {
+
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+
+    50% {
+      transform: scale(1.05);
+      opacity: 1;
+    }
+  }
+
+  .dc-pulse-glow {
+    animation: dc-pulse-glow 2s ease-in-out infinite;
+  }
+
+  .dc-sparkle {
+    animation: dc-sparkle 2s ease-in-out infinite;
+  }
+
+  .dc-float {
+    animation: dc-float 3s ease-in-out infinite;
+  }
+
+  .dc-breathe {
+    animation: dc-breathe 3s ease-in-out infinite;
+  }
+
+  /* Reference Image Styles */
+  .dc-dotted-circle {
+    border: 1.5px dashed hsla(var(--dc-pink-deep), 0.6);
+    border-radius: 9999px;
+  }
+
+  .dc-pin-shape {
+    position: relative;
+    width: 50px;
+    height: 65px;
+    background: #E2D1FF;
+    border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 8px;
+  }
+
+  @media (min-width: 400px) {
+    .dc-pin-shape {
+      width: 60px;
+      height: 75px;
+    }
+  }
+
+  /* Specific map-pin shape for cycle day */
+  .dc-cycle-pin {
+    width: 60px;
+    height: 75px;
+    background: #E2D1FF;
+    border-radius: 50% 50% 15% 15%;
+    clip-path: polygon(0% 0%, 100% 0%, 100% 60%, 50% 100%, 0% 60%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-top: 8px;
+    padding-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(180, 100, 220, 0.2);
+    border: 2px solid rgba(147, 112, 219, 0.2);
+  }
+
+  @media (min-width: 400px) {
+    .dc-cycle-pin {
+      width: 72px;
+      height: 90px;
+      padding-top: 10px;
+      padding-bottom: 20px;
+    }
+  }
+
+  .dc-cycle-pin-inner {
+    width: 42px;
+    height: 42px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 800;
+    color: #1a1a1a;
+  }
+
+  @media (min-width: 400px) {
+    .dc-cycle-pin-inner {
+      width: 52px;
+      height: 52px;
+      font-size: 24px;
+    }
+  }
+
+  /* Utility to hide scrollbars while maintaining functionality */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none !important;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none !important; /* IE and Edge */
+    scrollbar-width: none !important; /* Firefox */
+  }
+}
