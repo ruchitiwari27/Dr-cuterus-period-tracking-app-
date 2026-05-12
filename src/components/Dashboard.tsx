@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { isSameDay, differenceInCalendarDays, format, addDays, startOfWeek } from "date-fns";
+import { formatDateToYYYYMMDD } from "@/lib/dateUtils";
 import cardMoodEnergy from "@/assets/card-mood-energy.jpg";
 import cardMoodSwings from "@/assets/card-mood-swings.jpg";
 import cardDischarge from "@/assets/card-discharge.jpg";
@@ -1046,13 +1047,19 @@ const Dashboard = ({
       const uid = await getUserId();
       if (!uid) return;
       // Delete all and re-insert (simplest sync for date arrays)
-      await supabase.from('period_dates').delete().eq('user_id', uid);
-      if (periodDates.length > 0) {
-        const rows = periodDates.map(d => ({
-          user_id: uid,
-          date: d.toISOString().split('T')[0]
-        }));
+      const rows = periodDates.map(d => ({
+        user_id: uid,
+        date: formatDateToYYYYMMDD(d)
+      }));
+      
+      if (rows.length > 0) {
+        // Use upsert to avoid issues with duplicates, but we still need to handle removals
+        // Actually, for period dates, a full delete+insert is sometimes safer if the array is small,
+        // but let's at least fix the date format first.
+        await supabase.from('period_dates').delete().eq('user_id', uid);
         await supabase.from('period_dates').insert(rows);
+      } else {
+        await supabase.from('period_dates').delete().eq('user_id', uid);
       }
     };
     syncPeriodDates();
@@ -1065,50 +1072,22 @@ const Dashboard = ({
     const syncDailyLogs = async () => {
       const uid = await getUserId();
       if (!uid) return;
-      for (const [dateKey, log] of Object.entries(dailyLogs)) {
-        // Append hashtags and period_status to notes to prevent schema errors if columns are missing in DB
-        let finalNotes = log.notes || '';
-        if (log.hashtags) finalNotes += `\n\nHashtags: ${log.hashtags}`;
-        if (log.periodStatus && log.periodStatus !== 'no-period') finalNotes += `\n\nFlow: ${log.periodStatus}`;
-        finalNotes = finalNotes.trim();
+      
+      const rows = Object.entries(dailyLogs).map(([dateKey, log]) => ({
+        user_id: uid, 
+        log_date: dateKey,
+        mood: log.mood || '', 
+        symptoms: log.symptoms || [], 
+        notes: log.notes || '',
+        hashtags: log.hashtags || '',
+        period_status: log.periodStatus || 'no-period',
+        updated_at: new Date().toISOString()
+      }));
 
-        const payload = {
-          user_id: uid, 
-          log_date: dateKey,
-          mood: log.mood || '', 
-          symptoms: log.symptoms || [], 
-          notes: finalNotes,
-          updated_at: new Date().toISOString()
-        };
-
-        const { data: existing, error: selectError } = await supabase.from('daily_logs')
-          .select('log_date')
-          .eq('user_id', uid)
-          .eq('log_date', dateKey)
-          .maybeSingle();
-
-        if (selectError) {
-          console.error("Daily log check error:", selectError);
-          toast.error(`Sync error: ${selectError.message}`);
-          continue; // Skip this log if we can't even read from the DB
-        }
-
-        if (existing) {
-          const { error } = await supabase.from('daily_logs')
-            .update(payload)
-            .eq('user_id', uid)
-            .eq('log_date', dateKey);
-          if (error) {
-            console.error("Daily log update error:", error);
-            toast.error(`Sync error: ${error.message}`);
-          }
-        } else {
-          const { error } = await supabase.from('daily_logs')
-            .insert(payload);
-          if (error) {
-            console.error("Daily log insert error:", error);
-            toast.error(`Sync error: ${error.message}`);
-          }
+      if (rows.length > 0) {
+        const { error } = await supabase.from('daily_logs').upsert(rows, { onConflict: 'user_id,log_date' });
+        if (error) {
+          console.error("Daily log sync error:", error);
         }
       }
     };

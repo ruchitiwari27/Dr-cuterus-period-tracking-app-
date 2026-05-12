@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { formatDateToYYYYMMDD } from "@/lib/dateUtils";
 import SplashScreen from "./onboarding/SplashScreen";
 import SignInScreen from "./onboarding/SignInScreen";
 import CreateAccountScreen from "./onboarding/CreateAccountScreen";
@@ -83,6 +84,19 @@ const OnboardingFlow = () => {
   const [hasLoadedResponses, setHasLoadedResponses] = useState(false);
 
   const goTo = useCallback((screen: Screen, addToHistory = true) => {
+    if (screen === "calculating") {
+      // Mark as completed in Supabase when we hit calculating
+      const markCompleted = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await supabase.from('onboarding_responses').update({
+            completed_at: new Date().toISOString()
+          }).eq('id', session.user.id);
+        }
+      };
+      markCompleted();
+    }
+    
     if (addToHistory && screen !== currentScreen) {
       setHistory(prev => [...prev, currentScreen]);
       window.history.pushState({ screen }, "", `?step=${screen}`);
@@ -134,12 +148,30 @@ const OnboardingFlow = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setIsSignedIn(true);
-        const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || "User";
+        const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || "User";
         setUserData({ name, email: session.user.email || "" });
-        // If user was on splash/signin, go to where they left off or dashboard
+        
+        // Check if onboarding was completed
+        const { data: onboarding } = await supabase.from('onboarding_responses').select('completed_at').eq('id', session.user.id).maybeSingle();
+        const isCompleted = !!onboarding?.completed_at;
+
         const savedScreen = localStorage.getItem("dc_current_screen") as Screen;
-        if (!savedScreen || savedScreen === "splash" || savedScreen === "signin" || savedScreen === "create-account" || savedScreen === "verify-otp") {
-          setCurrentScreen("dashboard");
+        
+        // If signed in but onboarding not completed, and we are on a screen that shouldn't be accessible yet,
+        // go to 'for-yourself' (first onboarding screen after auth)
+        if (!isCompleted) {
+          if (!savedScreen || ["splash", "signin", "create-account", "verify-otp"].includes(savedScreen)) {
+            setCurrentScreen("for-yourself");
+          } else {
+            setCurrentScreen(savedScreen);
+          }
+        } else {
+          // Onboarding completed, go to dashboard or saved screen
+          if (!savedScreen || ["splash", "signin", "create-account", "verify-otp"].includes(savedScreen)) {
+            setCurrentScreen("dashboard");
+          } else {
+            setCurrentScreen(savedScreen);
+          }
         }
       }
       setAuthLoading(false);
@@ -150,7 +182,7 @@ const OnboardingFlow = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setIsSignedIn(true);
-        const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || "User";
+        const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || "User";
         setUserData({ name, email: session.user.email || "" });
       } else {
         setIsSignedIn(false);
@@ -168,7 +200,7 @@ const OnboardingFlow = () => {
 
   // Handle Hardware Back Button (Capacitor)
   useEffect(() => {
-    let listenerHandle: any = null;
+    let listenerHandle: { remove: () => void } | null = null;
 
     const handleBackButton = async () => {
       const { App } = await import('@capacitor/app');
@@ -263,7 +295,7 @@ const OnboardingFlow = () => {
         // last_period_start doesn't exist as a column in onboarding_responses
         // Save to period_dates table instead
         if (value) {
-          const dateStr = new Date(value as string).toISOString().split('T')[0];
+          const dateStr = formatDateToYYYYMMDD(new Date(value as string));
           const { error } = await supabase.from('period_dates').upsert(
             { user_id: uid, date: dateStr },
             { onConflict: 'user_id,date' }
@@ -287,47 +319,18 @@ const OnboardingFlow = () => {
           updated_at: new Date().toISOString()
         }, { onConflict: 'id' });
         if (error) {
-          console.error("Error syncing onboarding response:", error);
+          console.error("Error syncing onboarding:", error);
           toast.error(`Failed to save ${key}: ${error.message}`);
         }
       }
-    } catch (err) {
-      console.error("Unexpected error in updateResponse:", err);
+    } catch (e: unknown) {
+      console.error("Exception in updateResponse:", e);
     }
   };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("reset") === "true") {
-      localStorage.clear();
-      supabase.auth.signOut();
-      window.history.replaceState({}, document.title, window.location.pathname);
-      window.location.reload();
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("dc_current_screen", currentScreen);
   }, [currentScreen]);
-
-  const handleSignIn = (email: string) => {
-    setIsSignedIn(true);
-    setUserData(prev => ({ ...prev, name: email.split('@')[0] || "User", email }));
-    goTo("dashboard");
-  };
-
-  const handleCreateAccount = () => {
-    goTo("create-account");
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
-    setIsSignedIn(false);
-    setUserData({ name: "", email: "" });
-    setCurrentScreen("splash");
-    toast.success("Signed out! Starting fresh... ✨");
-  };
 
   const handleAccountCreated = (name: string, email: string, isAlreadyVerified: boolean) => {
     setPendingEmail(email);
@@ -347,217 +350,219 @@ const OnboardingFlow = () => {
     goTo("for-yourself");
   };
 
-  // Progress bar (only for data-collection screens, index 3–25)
-  const dataScreens = screens.slice(3, -1); // exclude splash, signin, create-account, dashboard
-  const dataIdx = dataScreens.indexOf(currentScreen as Screen);
-  const showProgress = dataIdx >= 0;
-  const progress = showProgress ? ((dataIdx + 1) / dataScreens.length) * 100 : 0;
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsSignedIn(false);
+    setUserData({ name: "", email: "" });
+    localStorage.clear();
+    setCurrentScreen("splash");
+    setHistory([]);
+  };
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5D1DA]">
-        <motion.div
-          animate={{ opacity: [0.4, 1, 0.4] }}
+      <div className="h-screen w-full flex items-center justify-center bg-background">
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [1, 0.5, 1] }} 
           transition={{ duration: 1.5, repeat: Infinity }}
-          className="text-[#63454A] text-sm font-bold tracking-widest uppercase"
+          className="w-16 h-16"
         >
-          Loading...
+          <div className="w-full h-full rounded-full border-4 border-dc-pink border-t-dc-pink-deep animate-spin" />
         </motion.div>
       </div>
     );
   }
 
-  const renderScreen = () => {
-    // Auth gate: if not signed in and trying to access post-auth screens
-    // Allow verify-otp screen without being signed in (it's part of signup flow)
-    if (!isSignedIn && screens.indexOf(currentScreen) > 3 && currentScreen !== "dashboard" && currentScreen !== "verify-otp") {
-      return (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="h-screen h-[100dvh] dc-gradient-warm flex flex-col items-center justify-center px-8"
-        >
-          <span className="text-5xl mb-4">🔒</span>
-          <h2 className="dc-heading text-xl font-bold text-center mb-2">Sign in to continue</h2>
-          <p className="text-muted-foreground text-sm text-center mb-6">
-            Please sign in or create an account to continue your wellness journey.
-          </p>
-          <button onClick={() => goTo("signin")} className="w-full dc-btn-primary text-sm">
-            Go to Sign In
-          </button>
-        </motion.div>
-      );
-    }
+  // Initial Splash Overlay
+  if (showInitialSplash) {
+    return <SplashScreen onComplete={() => setShowInitialSplash(false)} />;
+  }
 
-    if (showInitialSplash) {
-      return <SplashScreen onComplete={() => setShowInitialSplash(false)} />;
-    }
+  switch (currentScreen) {
+    case "splash": return <SplashScreen onComplete={() => goTo("signin")} />;
+    case "signin": return (
+      <SignInScreen 
+        onSignIn={() => { setIsSignedIn(true); goTo("dashboard"); }} 
+        onCreateAccount={() => goTo("create-account")}
+      />
+    );
+    case "create-account": return (
+      <CreateAccountScreen 
+        onAccountCreated={handleAccountCreated}
+        onBack={() => goTo("signin")} 
+      />
+    );
+    case "verify-otp": return (
+      <OTPVerificationScreen 
+        email={pendingEmail}
+        onVerified={handleOTPVerified}
+        onBack={() => goTo("create-account")}
+      />
+    );
 
-    switch (currentScreen) {
-      case "splash": return <SplashScreen onComplete={() => goTo("signin")} />;
-      case "signin": return <SignInScreen onSignIn={handleSignIn} onCreateAccount={handleCreateAccount} />;
-      case "create-account": return <CreateAccountScreen onSubmit={handleAccountCreated} onBack={() => goTo("signin")} />;
-      case "verify-otp": return <OTPVerificationScreen email={pendingEmail} onVerified={handleOTPVerified} onBack={() => goTo("create-account")} />;
+    // Main Onboarding Flow
+    case "for-yourself": return <ForYourselfScreen onNext={next} onBack={handleBack} />;
+    case "how-found": return (
+      <HowFoundUsScreen 
+        value={onboardingResponses.how_found_us}
+        onSelect={(v) => updateResponse('how_found_us', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "birth-year": return (
+      <BirthYearScreen 
+        value={onboardingResponses.birth_year}
+        onSelect={(v) => updateResponse('birth_year', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "goals": return (
+      <GoalsScreen 
+        value={onboardingResponses.goals}
+        onSelect={(v) => updateResponse('goals', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "help": return <HelpScreen onNext={next} onBack={handleBack} />;
+    case "got-it": return <GotItScreen onNext={next} onBack={handleBack} />;
+    case "period-feelings": return (
+      <PeriodFeelingsScreen 
+        value={onboardingResponses.period_feelings}
+        onSelect={(v) => updateResponse('period_feelings', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "cycle-mood": return (
+      <CycleMoodScreen 
+        value={onboardingResponses.cycle_mood}
+        onSelect={(v) => updateResponse('cycle_mood', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "regular-periods": return (
+      <RegularPeriodsScreen 
+        value={onboardingResponses.period_regularity}
+        onSelect={(v) => updateResponse('period_regularity', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "last-period": return (
+      <LastPeriodCalendar
+        value={onboardingResponses.last_period_start}
+        onSelectDates={(dates) => {
+          if (dates.length > 0) {
+            updateResponse('last_period_start', dates[0].toISOString());
+          }
+        }}
+        onNext={next}
+      />
+    );
+    case "discharge-decoder": return (
+      <DischargeDecoderScreen 
+        value={onboardingResponses.discharge_awareness}
+        onSelect={(v) => updateResponse('discharge_awareness', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "health-conditions": return (
+      <HealthConditionsScreen 
+        value={onboardingResponses.health_conditions}
+        onSelect={(v) => updateResponse('health_conditions', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "symptoms": return (
+      <SymptomsScreen 
+        value={onboardingResponses.symptoms}
+        onSelect={(v) => updateResponse('symptoms', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "cycle-symptoms": return (
+      <CycleSymptomsScreen 
+        value={onboardingResponses.cycle_symptoms}
+        onSelect={(v) => updateResponse('cycle_symptoms', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "height": return (
+      <HeightScreen 
+        value={onboardingResponses.height_cm}
+        onSelect={(v) => updateResponse('height_cm', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "weight": return (
+      <WeightScreen 
+        value={onboardingResponses.weight_kg}
+        onSelect={(v) => updateResponse('weight_kg', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "energy-impact": return (
+      <EnergyImpactScreen 
+        value={onboardingResponses.energy_impact}
+        onSelect={(v) => updateResponse('energy_impact', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "sleep-impact": return (
+      <SleepImpactScreen 
+        value={onboardingResponses.sleep_impact}
+        onSelect={(v) => updateResponse('sleep_impact', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "mental-health": return (
+      <MentalHealthScreen 
+        value={onboardingResponses.mental_health}
+        onSelect={(v) => updateResponse('mental_health', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "sleep-improvement": return (
+      <SleepImprovementScreen 
+        value={onboardingResponses.sleep_improvement}
+        onSelect={(v) => updateResponse('sleep_improvement', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "sleep-hours": return (
+      <SleepHoursScreen 
+        value={onboardingResponses.sleep_hours}
+        onSelect={(v) => updateResponse('sleep_hours', v)}
+        onNext={next} 
+        onBack={handleBack} 
+      />
+    );
+    case "calculating": return <CalculatingScreen onComplete={next} />;
+    case "dashboard": return (
+      <Dashboard 
+        userData={userData} 
+        initialPeriodDates={onboardingPeriodDates} 
+        onLogout={handleLogout}
+        setBackHandler={(handler) => { dashboardBackRef.current = handler; }}
+      />
+    );
 
-      case "for-yourself": return (
-        <ForYourselfScreen
-          value={onboardingResponses.for_self}
-          onNext={(val) => { updateResponse('for_self', val); next(); }}
-        />
-      );
-      case "how-found": return (
-        <HowFoundUsScreen
-          value={onboardingResponses.how_found_us}
-          onNext={(val) => { updateResponse('how_found_us', val); next(); }}
-        />
-      );
-      case "birth-year": return (
-        <BirthYearScreen
-          value={onboardingResponses.birth_year}
-          onNext={(val) => { updateResponse('birth_year', val); next(); }}
-        />
-      );
-      case "goals": return (
-        <GoalsScreen
-          value={onboardingResponses.goals}
-          onNext={(val) => { updateResponse('goals', val); next(); }}
-        />
-      );
-      case "help": return <HelpScreen onNext={next} />; // Intro only
-      case "got-it": return <GotItScreen onNext={next} />; // Intro only
-
-      case "period-feelings": return (
-        <PeriodFeelingsScreen
-          value={onboardingResponses.period_feelings}
-          onNext={(val) => { updateResponse('period_feelings', val); next(); }}
-        />
-      );
-      case "cycle-mood": return <CycleMoodScreen onNext={next} />;
-      case "regular-periods": return (
-        <RegularPeriodsScreen
-          value={onboardingResponses.period_regularity}
-          onNext={(val) => { updateResponse('period_regularity', val); next(); }}
-        />
-      );
-      case "last-period": return (
-        <LastPeriodCalendar
-          value={onboardingResponses.last_period_start}
-          onSelectDates={(dates) => {
-            if (dates.length > 0) {
-              updateResponse('last_period_start', dates[0].toISOString());
-            }
-          }}
-          onNext={next}
-        />
-      );
-
-      case "discharge-decoder": return <DischargeDecoderScreen onNext={next} />;
-
-      case "health-conditions": return (
-        <HealthConditionsScreen
-          value={onboardingResponses.health_conditions}
-          onNext={(val) => { updateResponse('health_conditions', val); next(); }}
-        />
-      );
-      case "symptoms": return (
-        <SymptomsScreen
-          value={onboardingResponses.symptoms}
-          onNext={(val) => { updateResponse('symptoms', val); next(); }}
-        />
-      );
-      case "cycle-symptoms": return (
-        <CycleSymptomsScreen
-          value={onboardingResponses.cycle_symptoms}
-          onNext={(val) => { updateResponse('cycle_symptoms', val); next(); }}
-        />
-      );
-      case "height": return (
-        <HeightScreen
-          value={onboardingResponses.height_cm}
-          onNext={(val) => { updateResponse('height_cm', val); next(); }}
-        />
-      );
-      case "weight": return (
-        <WeightScreen
-          value={onboardingResponses.weight_kg}
-          onNext={(val) => { updateResponse('weight_kg', val); next(); }}
-        />
-      );
-      case "energy-impact": return (
-        <EnergyImpactScreen
-          value={onboardingResponses.energy_impact}
-          onNext={(val) => { updateResponse('energy_impact', val); next(); }}
-        />
-      );
-      case "sleep-impact": return (
-        <SleepImpactScreen
-          value={onboardingResponses.sleep_impact}
-          onNext={(val) => { updateResponse('sleep_impact', val); next(); }}
-        />
-      );
-      case "mental-health": return (
-        <MentalHealthScreen
-          value={onboardingResponses.mental_health}
-          onNext={(val) => { updateResponse('mental_health', val); next(); }}
-        />
-      );
-      case "sleep-improvement": return (
-        <SleepImprovementScreen
-          value={onboardingResponses.sleep_improvement}
-          onNext={(val) => { updateResponse('sleep_improvement', val); next(); }}
-        />
-      );
-      case "sleep-hours": return (
-        <SleepHoursScreen
-          value={onboardingResponses.sleep_hours}
-          onNext={(val) => { updateResponse('sleep_hours', val); next(); }}
-        />
-      );
-      case "calculating": return <CalculatingScreen onComplete={() => goTo("dashboard")} />;
-      case "dashboard": return (
-        <Dashboard
-          userData={userData}
-          initialPeriodDates={onboardingPeriodDates}
-          onLogout={handleLogout}
-          setBackHandler={(handler) => { dashboardBackRef.current = handler; }}
-        />
-      );
-      default: return null;
-    }
-  };
-
-  return (
-    <div className="h-screen h-[100dvh] dc-gradient-main flex items-center justify-center p-0 sm:p-4 overflow-hidden">
-      <div className="dc-phone-frame h-full rounded-none sm:rounded-[2.5rem] bg-[#F6D7E0] overflow-hidden shadow-none sm:shadow-2xl relative">
-        {/* Progress bar */}
-        {showProgress && currentScreen !== "calculating" && (
-          <div className="absolute top-0 left-0 right-0 z-50 px-4 pt-3">
-            <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-dc-pink-deep rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.4 }}
-              />
-            </div>
-          </div>
-        )}
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentScreen}
-            initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 1.05, filter: "blur(20px)" }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 h-full flex flex-col overflow-hidden"
-          >
-            {renderScreen()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  );
+    default: return <SplashScreen onComplete={() => goTo("signin")} />;
+  }
 };
 
 export default OnboardingFlow;

@@ -32,3 +32,5 @@ dist-ssr
 android/
 ios/
 capacitor.config.ts.old
+
+.vercel

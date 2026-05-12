@@ -550,10 +550,10 @@ const SettingsSection = ({
                          toast.success("Invite resent! ✨", {
                            description: `The OTP ${newOtp} was sent to ${partnerSync.partnerEmail}.`
                          });
-                        } catch (err: any) {
+                        } catch (err: unknown) {
                           console.error("EmailJS error:", err);
                           toast.dismiss();
-                          const errorMsg = err?.text || err?.message || "Check your credentials in .env";
+                          const errorMsg = (err as any)?.text || (err as any)?.message || "Check your credentials in .env";
                           toast.error(`Email failed: ${errorMsg}`, {
                             description: `Demo Mode: The OTP is ${newOtp}.`
                           });
@@ -649,11 +649,11 @@ const SettingsSection = ({
                           toast.success("Invitation emailed! ✨", {
                             description: `The OTP ${newOtp} was sent to ${partnerSync.partnerEmail}.`
                           });
-                        } catch (emailErr: any) {
+                        } catch (emailErr: unknown) {
                           console.error("EmailJS error:", emailErr);
                           toast.dismiss();
                           setPartnerSync(p => ({ ...p, status: 'pending', inviteSentAt: new Date().toISOString(), syncCode: newOtp }));
-                          const errorMsg = emailErr?.text || emailErr?.message || "Check your credentials in .env";
+                          const errorMsg = (emailErr as any)?.text || (emailErr as any)?.message || "Check your credentials in .env";
                           toast.error(`Email failed: ${errorMsg}`, {
                             description: `Demo Mode: The OTP is ${newOtp}.`
                           });
